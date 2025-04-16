@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>父子运动演示</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #container {
+            position: relative;
+            width: 800px;
+            height: 200px;
+            margin: 20px auto;
+            border: 1px solid #ccc;
+        }
+
+        .person {
+            position: absolute;
+            width: 40px;
+            height: 30px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 12px;
+        }
+
+        #xiaojun {
+            background-color: red;
+            left: 0;
+            top: 30px;
+        }
+
+        #baba {
+            background-color: blue;
+            left: 0;
+            top: 120px;
+        }
+
+        #timeline {
+            height: 50px;
+            line-height: 50px;
+        }
+
+        #controls {
+            margin: 20px;
+        }
+
+        #scale {
+            position: absolute;
+            bottom: -50px;
+            width: 800px;
+            text-align: center;
+        }
+
+        .label {
+            position: absolute;
+            color: red;
+            font-size: 12px;
+        }
+
+        .track {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: #000;
+        }
+
+        .track.xiaojun-track {
+            top: 60px;
+        }
+
+        .track.baba-track {
+            top: 150px;
+        }
+
+        .location-label {
+            position: absolute;
+            font-size: 12px;
+        }
+
+        .location-label.home {
+            left: -20px;
+            top: 190px;
+        }
+
+        .location-label.library {
+            right: -20px;
+            top: 190px;
+        }
+
+        #st-graph {
+            position: relative;
+            width: 800px;
+            height: 400px;
+            margin-top: 20px;
+            border: 1px solid #ccc;
+        }
+
+        .st-point {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        #st-xiaojun {
+            background-color: red;
+        }
+
+        #st-baba {
+            background-color: blue;
+        }
+
+        .st-label {
+            position: absolute;
+            color: red;
+            font-size: 12px;
+        }
+
+        table {
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border: 1px solid #ccc;
+            padding: 8px;
+        }
+
+        .encounter-label {
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>父子运动轨迹演示</h1>
+    <div id="container">
+        <div class="person" id="xiaojun">小军</div>
+        <div class="person" id="baba">爸爸</div>
+        <div class="track xiaojun-track"></div>
+        <div class="track baba-track"></div>
+        <div class="location-label home">家(0米)</div>
+        <div class="location-label library">图书馆(3000米)</div>
+    </div>
+
+    <div id="timeline">
+        当前时间：<span id="time">0.0</span>秒 |
+        小军位置：<span id="xjPos">0</span>米 |
+        爸爸位置：<span id="bbPos">0</span>米 |
+        相距距离：<span id="distance">0</span>米
+    </div>
+
+    <div id="controls">
+        <button onclick="togglePlay()">播放/暂停</button>
+        <button onclick="reset()">重置</button>
+    </div>
+
+    <div id="scale">
+        <span style="position: absolute; left: 0;">0</span>
+        <span style="position: absolute; left: 25%;">750</span>
+        <span style="position: absolute; left: 50%;">1500</span>
+        <span style="position: absolute; left: 75%;">2250</span>
+        <span style="position: absolute; right: 0;">3000</span>
+    </div>
+
+    <div id="st-graph">
+        <div class="st-point" id="st-xiaojun"></div>
+        <div class="st-point" id="st-baba"></div>
+        <div style="position: absolute; left: 0; bottom: 0; width: 100%; height: 1px; background: #000;"></div>
+        <div style="position: absolute; left: 0; bottom: 0; width: 1px; height: 100%; background: #000;"></div>
+        <div style="position: absolute; left: -20px; bottom: 0; font-size: 12px;">0</div>
+        <div style="position: absolute; left: -20px; top: 0; font-size: 12px;">3000</div>
+        <div style="position: absolute; right: 0; bottom: -20px; font-size: 12px;">30</div>
+        <canvas id="st-canvas" width="800" height="400"></canvas>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>事件类型</th>
+                <th>实际时间（分钟）</th>
+                <th>演示时间（秒）</th>
+                <th>距离（米）</th>
+            </tr>
+        </thead>
+        <tbody id="event-table-body">
+        </tbody>
+    </table>
+
+    <script>
+        const CANVAS_WIDTH = 800;
+        const TOTAL_TIME = 30; // 总时间缩短为 30 秒
+        const LIBRARY_DISTANCE = 3000;
+
+        let isPlaying = false;
+        let currentTime = 0;
+        let animationFrame = null;
+
+        const events = [
+            { type: '相遇', time: 12.5, distance: 1500, color: 'green' },
+            { type: '相遇', time: 18.75, distance: 2250, color: 'purple' },
+            { type: '相距100米', time: 10 / 3, distance: 100, color: 'orange' },
+            { type: '相距100米', time: 1400 / 120, distance: 100, color: 'orange' },
+            { type: '相距100米', time: 17.5, distance: 100, color: 'orange' },
+            { type: '相距100米', time: 20, distance: 100, color: 'orange' },
+            { type: '相距100米', time: (1500 + 100) / 120, distance: 100, color: 'orange' },
+            { type: '相距100米', time: (3000 - 100) / 120, distance: 100, color: 'orange' }
+        ];
+
+        const eventTableBody = document.getElementById('event-table-body');
+        const stCanvas = document.getElementById('st-canvas');
+        const stCtx = stCanvas.getContext('2d');
+
+        let xjPath = new Path2D();
+        let bbPath = new Path2D();
+        xjPath.moveTo(0, 400);
+        bbPath.moveTo(0, 400);
+
+        const displayedEvents = new Set();
+
+        function getPosition(time) {
+            const realTime = time * (25 / 30); // 调整时间转换比例
+            const xjPos = Math.min(120 * realTime, LIBRARY_DISTANCE);
+            let bbPos;
+            if (realTime <= 10) {
+                bbPos = 150 * realTime;
+            } else if (realTime <= 15) {
+                bbPos = 1500;
+            } else {
+                bbPos = Math.min(1500 + 200 * (realTime - 15), LIBRARY_DISTANCE);
+            }
+            return { xjPos, bbPos, realTime };
+        }
+
+        function updatePosition(time) {
+            const { xjPos, bbPos, realTime } = getPosition(time);
+            const xjPx = (xjPos / LIBRARY_DISTANCE) * CANVAS_WIDTH;
+            const bbPx = (bbPos / LIBRARY_DISTANCE) * CANVAS_WIDTH;
+
+            document.getElementById('xiaojun').style.left = `${xjPx}px`;
+            document.getElementById('baba').style.left = `${bbPx}px`;
+            document.getElementById('time').textContent = `${time.toFixed(1)}秒`;
+            document.getElementById('xjPos').textContent = `${xjPos.toFixed(0)}米`;
+            document.getElementById('bbPos').textContent = `${bbPos.toFixed(0)}米`;
+            document.getElementById('distance').textContent = `${Math.abs(xjPos - bbPos).toFixed(0)}米`;
+
+            const stXjX = (time / TOTAL_TIME) * 800;
+            const stXjY = 400 - (xjPos / LIBRARY_DISTANCE) * 400;
+            const stBbX = (time / TOTAL_TIME) * 800;
+            const stBbY = 400 - (bbPos / LIBRARY_DISTANCE) * 400;
+
+            document.getElementById('st-xiaojun').style.left = `${stXjX - 5}px`;
+            document.getElementById('st-xiaojun').style.top = `${stXjY - 5}px`;
+            document.getElementById('st-baba').style.left = `${stBbX - 5}px`;
+            document.getElementById('st-baba').style.top = `${stBbY - 5}px`;
+
+            xjPath.lineTo(stXjX, stXjY);
+            bbPath.lineTo(stBbX, stBbY);
+
+            stCtx.clearRect(0, 0, 800, 400);
+            stCtx.strokeStyle = 'red';
+            stCtx.stroke(xjPath);
+            stCtx.strokeStyle = 'blue';
+            stCtx.stroke(bbPath);
+
+            events.forEach(event => {
+                const demoTime = event.time * (30 / 25); // 调整演示时间计算
+                const tolerance = 0.1;
+                if (time >= demoTime - tolerance && time <= demoTime + tolerance) {
+                    const eventKey = `${event.type}-${event.time}-${event.distance}`;
+                    if (!displayedEvents.has(eventKey)) {
+                        const label = document.createElement('div');
+                        label.className = 'label';
+                        label.style.color = event.color;
+                        label.style.left = `${(event.distance / LIBRARY_DISTANCE) * CANVAS_WIDTH - 30}px`;
+                        label.style.top = '20px';
+                        label.textContent = `${event.type} (${event.distance}米, ${event.time.toFixed(2)}分钟)`;
+                        if (event.type === '相遇') {
+                            label.classList.add('encounter-label');
+                        }
+                        document.getElementById('container').appendChild(label);
+
+                        const stLabel = document.createElement('div');
+                        stLabel.className = 'st-label';
+                        stLabel.style.color = event.color;
+                        stLabel.style.left = `${(demoTime / TOTAL_TIME) * 800 - 30}px`;
+                        stLabel.style.top = `${400 - (event.distance / LIBRARY_DISTANCE) * 400 - 20}px`;
+                        stLabel.textContent = `${event.type} (${event.distance}米, ${event.time.toFixed(2)}分钟)`;
+                        if (event.type === '相遇') {
+                            stLabel.classList.add('encounter-label');
+                        }
+                        document.getElementById('st-graph').appendChild(stLabel);
+
+                        const row = document.createElement('tr');
+                        const typeCell = document.createElement('td');
+                        const realTimeCell = document.createElement('td');
+                        const demoTimeCell = document.createElement('td');
+                        const distanceCell = document.createElement('td');
+
+                        typeCell.textContent = event.type;
+                        realTimeCell.textContent = event.time.toFixed(2);
+                        demoTimeCell.textContent = (event.time * (30 / 25)).toFixed(2);
+                        distanceCell.textContent = event.distance;
+
+                        row.appendChild(typeCell);
+                        row.appendChild(realTimeCell);
+                        row.appendChild(demoTimeCell);
+                        row.appendChild(distanceCell);
+
+                        eventTableBody.appendChild(row);
+
+                        displayedEvents.add(eventKey);
+
+                        if (event.type!== '相遇') {
+                            setTimeout(() => {
+                                label.remove();
+                                stLabel.remove();
+                            }, 1000);
+                        }
+                    }
+                }
+            });
+        }
+
+        function animate(timestamp) {
+            if (!isPlaying) return;
+            currentTime = Math.min(currentTime + (timestamp - lastTimestamp) / 1000, TOTAL_TIME);
+            lastTimestamp = timestamp;
+            updatePosition(currentTime);
+            animationFrame = requestAnimationFrame(animate);
+        }
+
+        let lastTimestamp = 0;
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            if (isPlaying) {
+                lastTimestamp = performance.now();
+                animationFrame = requestAnimationFrame(animate);
+            } else {
+                cancelAnimationFrame(animationFrame);
+            }
+        }
+
+        function reset() {
+            cancelAnimationFrame(animationFrame);
+            currentTime = 0;
+            xjPath = new Path2D();
+            bbPath = new Path2D();
+            xjPath.moveTo(0, 400);
+            bbPath.moveTo(0, 400);
+            stCtx.clearRect(0, 0, 800, 400);
+            updatePosition(0);
+            document.querySelectorAll('.label').forEach(l => l.remove());
+            document.querySelectorAll('.st-label').forEach(l => l.remove());
+            eventTableBody.innerHTML = '';
+            displayedEvents.clear();
+        }
+
+        reset();
+    </script>
+</body>
+
+</html>    
